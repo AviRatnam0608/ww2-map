@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WW2 Interactive Atlas</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+/* ═══════════════════════════════════════
+   styles/base.css - Reset & Variables
+   ═══════════════════════════════════════ */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-primary: #0a0c10;
+  --bg-panel: #0d0f14;
+  --bg-panel-end: #111520;
+  --gold: #c0a030;
+  --gold-bright: #e0c060;
+  --gold-dim: rgba(180, 160, 120, 0.5);
+  --gold-faint: rgba(180, 160, 120, 0.15);
+  --gold-ghost: rgba(180, 160, 120, 0.08);
+  --text-primary: #e8e0d0;
+  --text-secondary: rgba(200, 190, 170, 0.7);
+  --text-dim: rgba(180, 170, 150, 0.6);
+  --text-ghost: rgba(180, 160, 120, 0.4);
+  --axis-color: #b42828;
+  --axis-peak: #d43030;
+  --turning-color: #c4a020;
+  --allied-color: #2860a0;
+  --victory-color: #2a7030;
+  --soviet-color: rgba(140, 30, 30, 0.8);
+  --font-serif: 'EB Garamond', 'Garamond', 'Georgia', serif;
+  --font-mono: 'Courier New', monospace;
+  --panel-width: 320px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg-primary); }
+
+body {
+  font-family: var(--font-serif);
+  color: var(--text-primary);
+  display: flex;
+}
+
+/* ═══════════════════════════════════════
+   styles/timeline.css - Left Panel
+   ═══════════════════════════════════════ */
+#timeline-panel {
+  width: var(--panel-width);
+  min-width: var(--panel-width);
+  height: 100vh;
+  background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-panel-end) 100%);
+  border-right: 1px solid var(--gold-faint);
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  position: relative;
+}
+
+.panel-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid rgba(180, 160, 120, 0.1);
+}
+
+.panel-header .subtitle {
+  font-size: 11px;
+  letter-spacing: 4px;
+  color: var(--gold-dim);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.panel-header h1 {
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.panel-header .tagline {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Year selector */
+.year-selector {
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--gold-ghost);
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.year-btn {
+  flex: 1;
+  min-width: 44px;
+  padding: 7px 4px;
+  background: transparent;
+  border: 1px solid var(--gold-ghost);
+  border-radius: 3px;
+  color: var(--text-ghost);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  transition: all 0.25s ease;
+  text-align: center;
+}
+
+.year-btn:hover { background: var(--gold-ghost); color: var(--text-secondary); }
+.year-btn.active {
+  background: var(--gold-ghost);
+  border-color: var(--gold-dim);
+  color: var(--gold-bright);
+  font-weight: bold;
+}
+.year-btn.all-btn { letter-spacing: 1.5px; font-size: 10px; text-transform: uppercase; }
+
+/* Play button */
+.play-section {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--gold-ghost);
+}
+
+#play-btn {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--gold-ghost);
+  border: 1px solid var(--gold-faint);
+  border-radius: 4px;
+  color: var(--gold);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--font-serif);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+#play-btn:hover { background: rgba(180, 160, 120, 0.12); }
+#play-btn.playing {
+  background: rgba(180, 40, 40, 0.2);
+  border-color: rgba(180, 40, 40, 0.4);
+  color: #d08080;
+}
+
+/* Timeline list */
+#timeline-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.timeline-event {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 24px;
+  background: transparent;
+  border: none;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-serif);
+  transition: all 0.3s ease;
+  opacity: 0.65;
+}
+
+.timeline-event:hover { background: rgba(180, 160, 120, 0.04); opacity: 0.85; }
+
+.timeline-event.active {
+  background: var(--gold-ghost);
+  opacity: 1;
+}
+
+.timeline-event.past { opacity: 0.4; }
+
+.event-dot-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 20px;
+  padding-top: 3px;
+}
+
+.event-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gold-faint);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.timeline-event.active .event-dot {
+  width: 12px;
+  height: 12px;
+}
+
+.event-line {
+  width: 1px;
+  flex: 1;
+  min-height: 20px;
+  background: var(--gold-ghost);
+}
+
+.timeline-event.past .event-line { background: rgba(180, 160, 120, 0.15); }
+
+.event-content { flex: 1; padding-bottom: 8px; }
+
+.event-date {
+  font-size: 11px;
+  color: var(--text-ghost);
+  letter-spacing: 1px;
+  margin-bottom: 2px;
+  font-family: var(--font-mono);
+}
+
+.timeline-event.active .event-date { letter-spacing: 1.5px; }
+
+.event-title {
+  font-size: 15px;
+  color: var(--text-secondary);
+  font-weight: 400;
+  line-height: 1.3;
+  transition: color 0.3s ease;
+}
+
+.timeline-event.active .event-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.event-description {
+  font-size: 13px;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-top: 6px;
+  display: none;
+  animation: fadeIn 0.4s ease;
+}
+
+.timeline-event.active .event-description { display: block; }
+
+/* Legend */
+#legend {
+  padding: 16px 24px;
+  border-top: 1px solid rgba(180, 160, 120, 0.1);
+}
+
+#legend .legend-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--text-ghost);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-swatch.circle { border-radius: 50%; }
+
+.legend-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ═══════════════════════════════════════
+   styles/map.css - Map Area
+   ═══════════════════════════════════════ */
+#map-container {
+  flex: 1;
+  height: 100vh;
+  position: relative;
+}
+
+#map {
+  width: 100%;
+  height: 100%;
+  background: var(--bg-primary);
+}
+
+/* Override Leaflet styles for dark theme */
+.leaflet-container { background: #0a0c10 !important; }
+.leaflet-control-zoom a {
+  background: rgba(13, 15, 20, 0.9) !important;
+  color: var(--gold) !important;
+  border-color: var(--gold-faint) !important;
+  font-size: 16px !important;
+}
+.leaflet-control-zoom a:hover {
+  background: rgba(30, 35, 45, 0.95) !important;
+}
+.leaflet-control-attribution {
+  background: rgba(10, 12, 16, 0.7) !important;
+  color: rgba(180, 160, 120, 0.3) !important;
+  font-size: 9px !important;
+}
+.leaflet-control-attribution a { color: rgba(180, 160, 120, 0.4) !important; }
+
+/* Phase indicator overlay */
+#phase-indicator {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: rgba(10, 12, 16, 0.88);
+  border: 1px solid rgba(180, 160, 120, 0.15);
+  border-radius: 4px;
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+#phase-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+#phase-label {
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+#phase-date {
+  font-size: 14px;
+  color: var(--gold);
+  margin-left: 8px;
+}
+
+/* Progress bar */
+#progress-bar-bg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(180, 160, 120, 0.08);
+  z-index: 1000;
+}
+
+#progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  transition: width 0.6s ease, background 0.6s ease;
+}
+
+/* ═══════════════════════════════════════
+   styles/cityPanel.css - Info Panel
+   ═══════════════════════════════════════ */
+#city-panel {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  width: 350px;
+  max-height: calc(100vh - 100px);
+  background: rgba(13, 15, 20, 0.96);
+  border: 1px solid rgba(180, 160, 120, 0.2);
+  border-radius: 6px;
+  overflow: hidden;
+  z-index: 1001;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  display: none;
+  animation: slideIn 0.3s ease;
+}
+
+#city-panel.open { display: block; }
+
+.city-panel-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(180, 160, 120, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.city-panel-header .label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: rgba(192, 160, 48, 0.6);
+  text-transform: uppercase;
+}
+
+.city-panel-header .city-name {
+  font-size: 20px;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+#close-city-btn {
+  width: 28px;
+  height: 28px;
+  background: rgba(180, 160, 120, 0.1);
+  border: 1px solid var(--gold-faint);
+  border-radius: 50%;
+  color: var(--gold);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  transition: background 0.2s;
+}
+
+#close-city-btn:hover { background: rgba(180, 160, 120, 0.2); }
+
+#city-event-tabs {
+  display: none;
+  border-bottom: 1px solid var(--gold-ghost);
+}
+
+#city-event-tabs.visible { display: flex; }
+
+.city-tab {
+  flex: 1;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-ghost);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--font-serif);
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.city-tab.active {
+  background: var(--gold-ghost);
+  border-bottom-color: var(--gold);
+  color: var(--gold-bright);
+}
+
+#city-event-content {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: 380px;
+}
+
+.event-image-container {
+  width: 100%;
+  height: 180px;
+  background: linear-gradient(135deg, rgba(30, 35, 45, 1), rgba(20, 25, 35, 1));
+  border-radius: 4px;
+  margin-bottom: 16px;
+  border: 1px solid var(--gold-ghost);
+  position: relative;
+  overflow: hidden;
+}
+
+.event-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.event-image-container img.loaded { opacity: 1; }
+
+.event-image-container .img-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.5s ease;
+}
+
+.event-image-container .img-placeholder.hidden { opacity: 0; }
+
+.event-image-container .img-placeholder .icon { font-size: 24px; opacity: 0.3; }
+.event-image-container .img-placeholder .img-label {
+  font-size: 9px;
+  color: rgba(180, 160, 120, 0.3);
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+.event-image-container .img-placeholder .loading-spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--gold-ghost);
+  border-top-color: var(--gold-dim);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Notable people section */
+.notable-people {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gold-ghost);
+}
+
+.notable-people h4 {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+  margin-bottom: 8px;
+  font-weight: 400;
+}
+
+.person-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  margin: 2px 4px 2px 0;
+  background: var(--gold-ghost);
+  border: 1px solid var(--gold-ghost);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Casualties / stats */
+.event-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.stat-item {
+  padding: 6px 10px;
+  background: rgba(180, 160, 120, 0.04);
+  border: 1px solid var(--gold-ghost);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.stat-item .stat-value {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 1px;
+}
+
+#city-event-title {
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+#city-event-date {
+  font-size: 12px;
+  color: var(--gold);
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+  font-family: var(--font-mono);
+}
+
+#city-event-text {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.event-source {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gold-ghost);
+  font-size: 10px;
+  color: rgba(180, 160, 120, 0.3);
+}
+
+/* Hint text */
+#map-hint {
+  position: absolute;
+  bottom: 14px;
+  right: 16px;
+  font-size: 11px;
+  color: rgba(180, 160, 120, 0.2);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* ═══════════════════════════════════════
+   styles/animations.css
+   ═══════════════════════════════════════ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(180, 160, 120, 0.15); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(180, 160, 120, 0.25); }
+
+/* Custom Leaflet marker */
+.city-marker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.city-marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(192, 160, 48, 0.7);
+  border: 2px solid rgba(192, 160, 48, 0.4);
+  box-shadow: 0 0 8px rgba(192, 160, 48, 0.3);
+  transition: all 0.3s ease;
+}
+
+.city-marker-dot.active {
+  width: 14px;
+  height: 14px;
+  background: #c0a030;
+  border-color: #e0c060;
+  box-shadow: 0 0 16px rgba(192, 160, 48, 0.5);
+}
+
+/* City label tooltip */
+.city-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: rgba(200, 190, 170, 0.6) !important;
+  font-family: 'EB Garamond', Georgia, serif !important;
+  font-size: 11px !important;
+  font-style: italic;
+  white-space: nowrap;
+  padding: 0 !important;
+}
+
+.city-label::before { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     components/TimelinePanel
+     ═══════════════════════════════════════ -->
+<div id="timeline-panel">
+  <div class="panel-header">
+    <div class="subtitle">Interactive Atlas</div>
+    <h1>World War II</h1>
+    <div class="tagline">The Shifting Borders of Europe, 1939&ndash;1945</div>
+  </div>
+
+  <div class="year-selector" id="year-selector">
+    <button class="year-btn all-btn active" data-year="all">All</button>
+    <button class="year-btn" data-year="1939">1939</button>
+    <button class="year-btn" data-year="1940">1940</button>
+    <button class="year-btn" data-year="1941">1941</button>
+    <button class="year-btn" data-year="1942">1942</button>
+    <button class="year-btn" data-year="1943">1943</button>
+    <button class="year-btn" data-year="1944">1944</button>
+    <button class="year-btn" data-year="1945">1945</button>
+  </div>
+
+  <div class="play-section">
+    <button id="play-btn">&#9654; Play Through War</button>
+  </div>
+
+  <div id="timeline-list"></div>
+
+  <div id="legend">
+    <div class="legend-title">Legend</div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background: rgba(180, 40, 40, 0.6)"></div>
+      <div class="legend-label">Axis Powers</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background: rgba(40, 80, 160, 0.5)"></div>
+      <div class="legend-label">Western Allies</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch" style="background: rgba(140, 30, 30, 0.5)"></div>
+      <div class="legend-label">Soviet Union</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch circle" style="background: #c0a030; border: 2px solid #c0a030;"></div>
+      <div class="legend-label">Battle / Event Marker</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     components/MapView
+     ═══════════════════════════════════════ -->
+<div id="map-container">
+  <div id="phase-indicator">
+    <div id="phase-dot"></div>
+    <span id="phase-label"></span>
+    <span id="phase-date"></span>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="progress-bar-bg">
+    <div id="progress-bar-fill"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       components/CityInfoPanel
+       ═══════════════════════════════════════ -->
+  <div id="city-panel">
+    <div class="city-panel-header">
+      <div>
+        <div class="label">Historical Events</div>
+        <div class="city-name" id="city-panel-name"></div>
+      </div>
+      <button id="close-city-btn">&#10005;</button>
+    </div>
+    <div id="city-event-tabs"></div>
+    <div id="city-event-content">
+      <div class="event-image-container" id="city-image-container">
+        <img id="city-event-img" alt="" />
+        <div class="img-placeholder" id="city-img-placeholder">
+          <div class="loading-spinner" id="city-img-spinner" style="display:none"></div>
+          <div class="icon" id="city-img-icon">&#127963;&#65039;</div>
+          <div class="img-label">HISTORICAL PHOTOGRAPH</div>
+        </div>
+      </div>
+      <h3 id="city-event-title"></h3>
+      <div id="city-event-date"></div>
+      <p id="city-event-text"></p>
+      <div class="event-stats" id="city-event-stats"></div>
+      <div class="notable-people" id="city-notable-people" style="display:none">
+        <h4>Notable Figures</h4>
+        <div id="notable-people-list"></div>
+      </div>
+      <div class="event-source" id="city-event-source"></div>
+    </div>
+  </div>
+
+  <div id="map-hint">Scroll to zoom &middot; Drag to pan &middot; Click markers to explore</div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     INLINE DATA MODULES
+     (In Cursor, these would be separate imports)
+     ═══════════════════════════════════════ -->
+<script>
+// ─── data/events.js ────────────────────────
+const WW2_EVENTS = [
+  // ── 1939 ──
+  { id: "invasion_poland", year: 1939, date: "Sep 1, 1939", title: "Invasion of Poland", description: "Germany invades Poland with 1.5 million troops in a devastating Blitzkrieg. The Luftwaffe destroys the Polish Air Force on the ground. Britain and France declare war on September 3.", phase: "invasion_poland", wikiArticle: "Invasion_of_Poland" },
+  { id: "battle_westerplatte", year: 1939, date: "Sep 1\u20137, 1939", title: "Battle of Westerplatte", description: "A small Polish garrison of 182 soldiers holds out for seven days against overwhelming German naval and ground forces at Gda\u0144sk, becoming a symbol of Polish resistance.", phase: "invasion_poland", wikiArticle: "Battle_of_Westerplatte" },
+  { id: "battle_atlantic_begins", year: 1939, date: "Sep 3, 1939", title: "Battle of the Atlantic Begins", description: "The longest continuous military campaign of the war begins as German U-boats target Allied merchant shipping. Over 3,500 Allied vessels will be sunk by war\u2019s end.", phase: "invasion_poland", wikiArticle: "Battle_of_the_Atlantic" },
+  { id: "soviet_invasion_poland", year: 1939, date: "Sep 17, 1939", title: "Soviet Invasion of Poland", description: "The Soviet Union invades eastern Poland per the Molotov\u2013Ribbentrop Pact\u2019s secret protocol. Poland is partitioned between Germany and the USSR.", phase: "invasion_poland", wikiArticle: "Soviet_invasion_of_Poland" },
+  { id: "winter_war", year: 1939, date: "Nov 30, 1939", title: "Winter War Begins", description: "The Soviet Union invades Finland with 600,000 troops. The Finns mount a fierce defense using guerrilla tactics in the frozen forests, inflicting devastating losses on the Red Army.", phase: "invasion_poland", wikiArticle: "Winter_War" },
+
+  // ── 1940 ──
+  { id: "invasion_norway", year: 1940, date: "Apr 9, 1940", title: "Invasion of Denmark & Norway", description: "Germany launches Operation Weser\u00FCbung, conquering Denmark in six hours and invading Norway. The campaign secures vital iron ore supply routes from Sweden.", phase: "axis_expansion", wikiArticle: "Operation_Weserübung" },
+  { id: "fall_of_france", year: 1940, date: "May 10, 1940", title: "Fall of France", description: "Germany\u2019s Blitzkrieg through the Ardennes bypasses the Maginot Line. Panzer divisions race to the Channel coast, trapping Allied armies. France signs an armistice on June 22.", phase: "axis_expansion", wikiArticle: "Battle_of_France" },
+  { id: "dunkirk", year: 1940, date: "May 26, 1940", title: "Evacuation of Dunkirk", description: "338,000 Allied troops are rescued from the beaches of Dunkirk by a fleet of over 800 vessels, including civilian boats. A military defeat turned into a morale-boosting miracle.", phase: "axis_expansion", wikiArticle: "Dunkirk_evacuation" },
+  { id: "battle_of_britain", year: 1940, date: "Jul 10, 1940", title: "Battle of Britain", description: "The RAF defends Britain against the Luftwaffe\u2019s sustained aerial assault. Outnumbered British pilots, aided by radar, defeat the German air campaign. Hitler postpones invasion.", phase: "axis_expansion", wikiArticle: "Battle_of_Britain" },
+  { id: "the_blitz", year: 1940, date: "Sep 7, 1940", title: "The Blitz Begins", description: "The Luftwaffe shifts to bombing London and other British cities. 57 consecutive nights of bombing kill over 43,000 civilians, but British morale refuses to break.", phase: "axis_expansion", wikiArticle: "The_Blitz" },
+  { id: "italy_invades_greece", year: 1940, date: "Oct 28, 1940", title: "Italy Invades Greece", description: "Mussolini launches an invasion of Greece from Albania. The Greeks counterattack ferociously, pushing Italian forces back into Albania in a humiliating defeat.", phase: "axis_expansion", wikiArticle: "Greco-Italian_War" },
+
+  // ── 1941 ──
+  { id: "north_africa_1941", year: 1941, date: "Feb 12, 1941", title: "Rommel Arrives in North Africa", description: "Erwin Rommel and the Afrika Korps arrive in Libya to reinforce the faltering Italians. The \u2018Desert Fox\u2019 will wage a legendary campaign across the Sahara.", phase: "axis_peak", wikiArticle: "Erwin_Rommel" },
+  { id: "balkans_campaign", year: 1941, date: "Apr 6, 1941", title: "Invasion of Yugoslavia & Greece", description: "Germany invades Yugoslavia and Greece simultaneously. Belgrade is devastated by bombing. Both nations fall within weeks, securing the Axis southern flank before Barbarossa.", phase: "axis_peak", wikiArticle: "Invasion_of_Yugoslavia" },
+  { id: "battle_of_crete", year: 1941, date: "May 20, 1941", title: "Battle of Crete", description: "Germany launches the first major airborne invasion in history. Despite heavy paratrooper losses, Crete falls in 10 days. The casualties are so severe that Hitler never approves another large airborne operation.", phase: "axis_peak", wikiArticle: "Battle_of_Crete" },
+  { id: "operation_barbarossa", year: 1941, date: "Jun 22, 1941", title: "Operation Barbarossa", description: "3.8 million Axis troops launch the largest military invasion in history along a 1,800-mile front against the Soviet Union. Initial advances are devastating: millions of Soviet soldiers are killed or captured.", phase: "axis_peak", wikiArticle: "Operation_Barbarossa" },
+  { id: "siege_leningrad", year: 1941, date: "Sep 8, 1941", title: "Siege of Leningrad Begins", description: "German and Finnish forces encircle Leningrad. The siege will last 872 days\u2014the longest in modern history. Over one million civilians die, primarily from starvation during the brutal winters.", phase: "axis_peak", wikiArticle: "Siege_of_Leningrad" },
+  { id: "battle_moscow", year: 1941, date: "Oct 2, 1941", title: "Battle of Moscow", description: "Operation Typhoon drives German forces within 19 miles of the Kremlin. The Soviet winter counteroffensive, using fresh Siberian divisions, drives them back over 100 miles\u2014Germany\u2019s first major land defeat.", phase: "axis_peak", wikiArticle: "Battle_of_Moscow" },
+  { id: "pearl_harbor", year: 1941, date: "Dec 7, 1941", title: "Attack on Pearl Harbor", description: "Japan\u2019s surprise attack on Pearl Harbor kills 2,403 Americans and sinks or damages 21 ships. The United States declares war, transforming the conflict into a truly global war.", phase: "axis_peak", wikiArticle: "Attack_on_Pearl_Harbor" },
+
+  // ── 1942 ──
+  { id: "fall_of_singapore", year: 1942, date: "Feb 15, 1942", title: "Fall of Singapore", description: "80,000 British and Commonwealth troops surrender to a smaller Japanese force\u2014the largest British surrender in history. Churchill calls it \u2018the worst disaster in British military history.\u2019", phase: "axis_peak_42", wikiArticle: "Fall_of_Singapore" },
+  { id: "battle_midway", year: 1942, date: "Jun 4, 1942", title: "Battle of Midway", description: "US Navy dive bombers sink four Japanese aircraft carriers in five minutes, turning the tide of the Pacific War. American codebreakers made the ambush possible.", phase: "axis_peak_42", wikiArticle: "Battle_of_Midway" },
+  { id: "first_el_alamein", year: 1942, date: "Jul 1, 1942", title: "First Battle of El Alamein", description: "Auchinleck\u2019s Eighth Army halts Rommel\u2019s advance into Egypt, just 150 miles from the Suez Canal. The Axis advance in North Africa is checked for the first time.", phase: "axis_peak_42", wikiArticle: "First_Battle_of_El_Alamein" },
+  { id: "stalingrad_begins", year: 1942, date: "Aug 23, 1942", title: "Battle of Stalingrad Begins", description: "The German 6th Army enters Stalingrad. What follows is the bloodiest battle in human history: months of savage house-to-house fighting in the ruins of the city.", phase: "axis_peak_42", wikiArticle: "Battle_of_Stalingrad" },
+  { id: "second_el_alamein", year: 1942, date: "Oct 23, 1942", title: "Second Battle of El Alamein", description: "Montgomery\u2019s Eighth Army smashes through Rommel\u2019s lines after a 12-day battle. Churchill declares: \u2018This is not the end. It is not even the beginning of the end. But it is, perhaps, the end of the beginning.\u2019", phase: "turning_point_42", wikiArticle: "Second_Battle_of_El_Alamein" },
+  { id: "operation_torch", year: 1942, date: "Nov 8, 1942", title: "Operation Torch", description: "Allied forces land in French North Africa with 107,000 troops. American forces enter the European/African theater for the first time. The Axis forces in Africa are now trapped between two Allied armies.", phase: "turning_point_42", wikiArticle: "Operation_Torch" },
+  { id: "stalingrad_encirclement", year: 1942, date: "Nov 23, 1942", title: "Stalingrad: Soviet Encirclement", description: "Operation Uranus encircles 300,000 German troops inside Stalingrad. The trap is complete. G\u00F6ring\u2019s promise to supply the 6th Army by air proves catastrophically inadequate.", phase: "turning_point_42", wikiArticle: "Operation_Uranus" },
+
+  // ── 1943 ──
+  { id: "stalingrad_ends", year: 1943, date: "Feb 2, 1943", title: "Stalingrad: German Surrender", description: "Field Marshal Paulus surrenders the remnants of the 6th Army\u201491,000 starving soldiers. Only 5,000 will ever return to Germany. The war\u2019s decisive turning point.", phase: "turning_point", wikiArticle: "Battle_of_Stalingrad" },
+  { id: "tunisia_falls", year: 1943, date: "May 13, 1943", title: "Fall of Tunisia", description: "275,000 Axis troops surrender in Tunisia, ending the North African campaign. The Mediterranean is now open for Allied invasion of Southern Europe.", phase: "turning_point", wikiArticle: "Tunisian_campaign" },
+  { id: "kursk", year: 1943, date: "Jul 5, 1943", title: "Battle of Kursk", description: "The largest tank battle in history: 6,000 tanks and 2 million soldiers clash across the Russian steppe. The Soviet victory ends Germany\u2019s ability to launch strategic offensives in the East.", phase: "turning_point", wikiArticle: "Battle_of_Kursk" },
+  { id: "invasion_sicily", year: 1943, date: "Jul 10, 1943", title: "Allied Invasion of Sicily", description: "160,000 Allied troops invade Sicily in Operation Husky. The campaign leads to Mussolini\u2019s overthrow on July 25 and Italy\u2019s surrender on September 8.", phase: "allied_advance_43", wikiArticle: "Allied_invasion_of_Sicily" },
+  { id: "italy_surrenders", year: 1943, date: "Sep 8, 1943", title: "Italy Surrenders", description: "Italy signs an armistice with the Allies. Germany immediately occupies northern and central Italy, disarming Italian forces. The brutal Italian Campaign begins as Allies land at Salerno.", phase: "allied_advance_43", wikiArticle: "Armistice_of_Cassibile" },
+  { id: "tehran_conference", year: 1943, date: "Nov 28, 1943", title: "Tehran Conference", description: "Roosevelt, Churchill, and Stalin meet for the first time. They agree on Operation Overlord\u2014the invasion of France\u2014for spring 1944, and the Soviet Union pledges to join the war against Japan.", phase: "allied_advance_43", wikiArticle: "Tehran_Conference" },
+
+  // ── 1944 ──
+  { id: "anzio", year: 1944, date: "Jan 22, 1944", title: "Battle of Anzio", description: "Allied forces land at Anzio, south of Rome, but fail to exploit the surprise. German counterattacks trap the beachhead for four months in some of the war\u2019s most grueling fighting.", phase: "allied_advance", wikiArticle: "Battle_of_Anzio" },
+  { id: "monte_cassino", year: 1944, date: "Jan\u2013May 1944", title: "Battles of Monte Cassino", description: "Four bloody Allied assaults on the Gustav Line. The historic monastery is controversially bombed. Polish troops finally take the summit in May, opening the road to Rome.", phase: "allied_advance", wikiArticle: "Battle_of_Monte_Cassino" },
+  { id: "d_day", year: 1944, date: "Jun 6, 1944", title: "D-Day: Normandy Landings", description: "156,000 Allied troops storm five beaches in the largest amphibious invasion in history. Despite heavy casualties at Omaha Beach, the beachheads hold. The liberation of Western Europe begins.", phase: "allied_advance", wikiArticle: "Normandy_landings" },
+  { id: "operation_bagration", year: 1944, date: "Jun 23, 1944", title: "Operation Bagration", description: "A massive Soviet offensive with 2.3 million troops destroys German Army Group Centre. The Germans suffer 400,000 casualties. Belarus is liberated and the Red Army reaches Poland.", phase: "allied_advance", wikiArticle: "Operation_Bagration" },
+  { id: "liberation_paris", year: 1944, date: "Aug 25, 1944", title: "Liberation of Paris", description: "The French 2nd Armored Division and US 4th Infantry Division liberate Paris after a popular uprising. General de Gaulle marches down the Champs-\u00C9lys\u00E9es to rapturous crowds.", phase: "allied_advance", wikiArticle: "Liberation_of_Paris" },
+  { id: "market_garden", year: 1944, date: "Sep 17, 1944", title: "Operation Market Garden", description: "The largest airborne operation in history attempts to capture bridges across the Netherlands. The plan fails at Arnhem\u2014\u2018A Bridge Too Far\u2019\u2014where British paratroopers are overwhelmed.", phase: "allied_advance", wikiArticle: "Operation_Market_Garden" },
+  { id: "warsaw_uprising", year: 1944, date: "Aug 1, 1944", title: "Warsaw Uprising", description: "The Polish Home Army rises against the German occupation. The Soviets halt their advance across the Vistula, and after 63 days of fierce fighting, the uprising is crushed. 200,000 civilians die.", phase: "allied_advance", wikiArticle: "Warsaw_Uprising" },
+  { id: "battle_of_bulge", year: 1944, date: "Dec 16, 1944", title: "Battle of the Bulge", description: "Germany\u2019s last major offensive in the West. 250,000 troops attack through the Ardennes in winter fog. After initial panic, American forces hold at Bastogne and counterattack. Germany\u2019s reserves are exhausted.", phase: "allied_advance_late", wikiArticle: "Battle_of_the_Bulge" },
+
+  // ── 1945 ──
+  { id: "vistula_oder", year: 1945, date: "Jan 12, 1945", title: "Vistula\u2013Oder Offensive", description: "The Red Army launches a colossal offensive with 2.2 million troops across Poland. Soviet forces advance 300 miles in two weeks, reaching the Oder River just 40 miles from Berlin.", phase: "victory_approach", wikiArticle: "Vistula–Oder_offensive" },
+  { id: "liberation_auschwitz", year: 1945, date: "Jan 27, 1945", title: "Liberation of Auschwitz", description: "Soviet troops liberate the Auschwitz concentration camp complex, finding 7,000 surviving prisoners. The full horror of the Holocaust begins to be revealed to the world.", phase: "victory_approach", wikiArticle: "Auschwitz_concentration_camp" },
+  { id: "crossing_rhine", year: 1945, date: "Mar 7, 1945", title: "Crossing the Rhine", description: "US forces capture the Ludendorff Bridge at Remagen\u2014the last intact bridge over the Rhine. Allied armies pour into the German heartland from the west.", phase: "victory_approach", wikiArticle: "Battle_of_Remagen" },
+  { id: "battle_berlin", year: 1945, date: "Apr 16, 1945", title: "Battle of Berlin", description: "2.5 million Soviet troops assault Berlin in the final major battle of the European war. Fierce street-by-street fighting devastates the capital. Hitler takes his own life on April 30.", phase: "victory", wikiArticle: "Battle_of_Berlin" },
+  { id: "ve_day", year: 1945, date: "May 8, 1945", title: "Victory in Europe Day", description: "Germany surrenders unconditionally. The war in Europe is over after five years, eight months, and six days. Celebrations erupt across the Allied world, but the Pacific war continues.", phase: "victory", wikiArticle: "Victory_in_Europe_Day" },
+];
+
+const PHASE_LABELS = {
+  invasion_poland: { label: "Invasion of Poland", color: "#b42828" },
+  axis_expansion: { label: "Axis Expansion", color: "#b42828" },
+  axis_peak: { label: "Axis at Peak Extent", color: "#d43030" },
+  axis_peak_42: { label: "Axis at Maximum Extent", color: "#d43030" },
+  turning_point_42: { label: "The Tide Turns", color: "#c4a020" },
+  turning_point: { label: "The Turning Point", color: "#c4a020" },
+  allied_advance_43: { label: "Allied Counter-Offensive", color: "#2860a0" },
+  allied_advance: { label: "Allied Liberation", color: "#2860a0" },
+  allied_advance_late: { label: "Closing the Vise", color: "#2860a0" },
+  victory_approach: { label: "Road to Victory", color: "#2a7030" },
+  victory: { label: "Victory in Europe", color: "#2a7030" },
+};
+
+// ─── data/cityMarkers.js ────────────────────────
+const CITY_MARKERS = [
+  { id: "warsaw", name: "Warsaw", lat: 52.2297, lng: 21.0122,
+    notablePeople: ["Witold Pilecki", "Mordechai Anielewicz", "Tadeusz Bór-Komorowski"],
+    events: [
+    { title: "Siege of Warsaw", date: "Sep 8\u201328, 1939", text: "The Luftwaffe bombed Warsaw relentlessly while German ground forces besieged the city. After 20 days of resistance and devastating civilian casualties, the garrison surrendered.", wikiArticle: "Siege_of_Warsaw_(1939)", casualties: "~40,000 civilian dead" },
+    { title: "Warsaw Ghetto Uprising", date: "Apr\u2013May 1943", text: "Jewish fighters led by Mordechai Anielewicz mounted an armed revolt against deportations to Treblinka. The Germans leveled the ghetto block by block over four weeks.", wikiArticle: "Warsaw_Ghetto_Uprising", casualties: "~13,000 killed" },
+    { title: "Warsaw Uprising", date: "Aug 1\u2013Oct 2, 1944", text: "The Polish Home Army under General Bór-Komorowski rose against the German occupation. The Soviets halted across the Vistula as the uprising was crushed after 63 days.", wikiArticle: "Warsaw_Uprising", casualties: "~200,000 civilian dead" },
+  ]},
+  { id: "london", name: "London", lat: 51.5074, lng: -0.1278,
+    notablePeople: ["Winston Churchill", "Hugh Dowding", "Keith Park"],
+    events: [
+    { title: "The Blitz", date: "Sep 1940\u2013May 1941", text: "The Luftwaffe bombed London for 57 consecutive nights beginning September 7. Over 43,000 civilians were killed across Britain. Churchill's defiant leadership rallied the nation.", wikiArticle: "The_Blitz", casualties: "~43,000 civilian dead" },
+    { title: "V-Weapon Attacks", date: "Jun 1944\u2013Mar 1945", text: "Germany launched V-1 flying bombs and V-2 rockets at London. Over 9,000 V-weapons struck Britain, killing nearly 9,000 civilians in the final terror campaign of the war.", wikiArticle: "V-1_flying_bomb", casualties: "~9,000 killed" },
+  ]},
+  { id: "paris", name: "Paris", lat: 48.8566, lng: 2.3522,
+    notablePeople: ["Charles de Gaulle", "Philippe Leclerc", "Dietrich von Choltitz"],
+    events: [
+    { title: "Fall of Paris", date: "Jun 14, 1940", text: "German forces entered Paris unopposed after the French government declared it an open city. The swastika flew from the Eiffel Tower. France signed an armistice on June 22.", wikiArticle: "Fall_of_France" },
+    { title: "Liberation of Paris", date: "Aug 25, 1944", text: "The French 2nd Armored Division under General Leclerc and US 4th Infantry Division liberated Paris. German commander von Choltitz defied Hitler's order to destroy the city.", wikiArticle: "Liberation_of_Paris" },
+  ]},
+  { id: "stalingrad_city", name: "Stalingrad", lat: 48.708, lng: 44.5133,
+    notablePeople: ["Vasily Chuikov", "Friedrich Paulus", "Vasily Zaitsev"],
+    events: [
+    { title: "Battle of Stalingrad", date: "Aug 1942\u2013Feb 1943", text: "The bloodiest battle in human history. Soviet soldiers fought for every building under General Chuikov's command. The encirclement by Operation Uranus trapped 300,000 Germans. Field Marshal Paulus surrendered on February 2, 1943.", wikiArticle: "Battle_of_Stalingrad", casualties: "~2 million total casualties" },
+  ]},
+  { id: "berlin", name: "Berlin", lat: 52.52, lng: 13.405,
+    notablePeople: ["Georgy Zhukov", "Adolf Hitler", "Helmuth Weidling"],
+    events: [
+    { title: "Allied Bombing Campaign", date: "1943\u20131945", text: "RAF and USAAF bombing raids devastated Berlin throughout the war. The 'Battle of Berlin' air campaign in 1943\u201344 caused enormous destruction and civilian casualties.", wikiArticle: "Bombing_of_Berlin_in_World_War_II" },
+    { title: "Battle of Berlin", date: "Apr 16\u2013May 2, 1945", text: "Marshal Zhukov's forces stormed Berlin with 2.5 million troops. Street-by-street fighting devastated the capital. Hitler took his own life in his bunker on April 30. Germany surrendered on May 8.", wikiArticle: "Battle_of_Berlin", casualties: "~170,000 killed" },
+  ]},
+  { id: "normandy", name: "Normandy", lat: 49.3438, lng: -0.8687,
+    notablePeople: ["Dwight D. Eisenhower", "Bernard Montgomery", "Erwin Rommel", "Theodore Roosevelt Jr."],
+    events: [
+    { title: "D-Day", date: "Jun 6, 1944", text: "156,000 Allied troops landed on five beaches (Utah, Omaha, Gold, Juno, Sword) in the largest amphibious invasion in history. Despite heavy casualties at Omaha Beach, all five beachheads held by nightfall.", wikiArticle: "Normandy_landings", casualties: "~10,000 Allied casualties on D-Day" },
+    { title: "Battle of Normandy", date: "Jun\u2013Aug 1944", text: "The breakout from Normandy culminated in Operation Cobra and the Falaise Pocket, where 50,000 German troops were trapped and destroyed. The road to Paris was open.", wikiArticle: "Battle_of_Normandy", casualties: "~425,000 total casualties" },
+  ]},
+  { id: "moscow", name: "Moscow", lat: 55.7558, lng: 37.6173,
+    notablePeople: ["Joseph Stalin", "Georgy Zhukov", "Ivan Panfilov"],
+    events: [
+    { title: "Battle of Moscow", date: "Oct 1941\u2013Jan 1942", text: "Operation Typhoon brought German forces within 19 miles of the Kremlin. Panfilov's 28 guardsmen became legendary for their stand at Dubosekovo. Fresh Siberian divisions launched a devastating winter counteroffensive.", wikiArticle: "Battle_of_Moscow", casualties: "~650,000 Soviet, ~250,000 German" },
+  ]},
+  { id: "kursk_city", name: "Kursk", lat: 51.7304, lng: 36.1926,
+    notablePeople: ["Erich von Manstein", "Konstantin Rokossovsky", "Pavel Rotmistrov"],
+    events: [
+    { title: "Battle of Kursk", date: "Jul 5\u2013Aug 23, 1943", text: "The largest tank battle in history: 6,000 tanks and 2 million soldiers clashed. At Prokhorovka, 600 Soviet tanks charged into 300 German panzers. The decisive Soviet victory ended Germany's offensive capability in the East.", wikiArticle: "Battle_of_Kursk", casualties: "~255,000 German, ~255,000 Soviet casualties" },
+  ]},
+  { id: "el_alamein", name: "El Alamein", lat: 30.8341, lng: 28.9525,
+    notablePeople: ["Bernard Montgomery", "Erwin Rommel"],
+    events: [
+    { title: "Second Battle of El Alamein", date: "Oct 23\u2013Nov 11, 1942", text: "Montgomery's Eighth Army smashed through Rommel's lines after a massive artillery barrage and 12-day battle. The Axis threat to Egypt and the Suez Canal was permanently ended.", wikiArticle: "Second_Battle_of_El_Alamein", casualties: "~37,000 Axis, ~13,500 Allied" },
+  ]},
+  { id: "rome", name: "Rome", lat: 41.9028, lng: 12.4964,
+    notablePeople: ["Mark Clark", "Benito Mussolini", "Albert Kesselring"],
+    events: [
+    { title: "Liberation of Rome", date: "Jun 4, 1944", text: "Allied forces captured Rome after the grueling Italian Campaign\u2014the first Axis capital to fall. General Clark controversially diverted forces to enter Rome rather than trap retreating Germans.", wikiArticle: "Battle_of_Rome", casualties: "~44,000 Allied casualties in approach" },
+  ]},
+  { id: "dunkirk", name: "Dunkirk", lat: 51.0343, lng: 2.3768,
+    notablePeople: ["Lord Gort", "Bertram Ramsay"],
+    events: [
+    { title: "Evacuation of Dunkirk", date: "May 26\u2013Jun 4, 1940", text: "Operation Dynamo rescued 338,000 Allied troops from the beaches by over 800 vessels, including civilian boats. Though a military defeat, it preserved the core of the British Army to fight on.", wikiArticle: "Dunkirk_evacuation", casualties: "~68,000 Allied casualties/captured" },
+  ]},
+  { id: "leningrad", name: "Leningrad", lat: 59.9343, lng: 30.3351,
+    notablePeople: ["Andrei Zhdanov", "Leonid Govorov"],
+    events: [
+    { title: "Siege of Leningrad", date: "Sep 1941\u2013Jan 1944", text: "The longest siege in modern history: 872 days. German and Finnish forces encircled the city. Over one million civilians died, primarily from starvation during the brutal winters. The city never surrendered.", wikiArticle: "Siege_of_Leningrad", casualties: "~1.5 million dead" },
+  ]},
+  { id: "tobruk", name: "Tobruk", lat: 32.0764, lng: 23.9538,
+    notablePeople: ["Leslie Morshead", "Erwin Rommel"],
+    events: [
+    { title: "Siege of Tobruk", date: "Apr\u2013Dec 1941", text: "Australian and Allied forces held the Libyan port against Rommel for 241 days, denying the Afrika Korps a critical supply port. The defenders became known as the 'Rats of Tobruk.'", wikiArticle: "Siege_of_Tobruk", casualties: "~3,600 Allied casualties" },
+  ]},
+  { id: "arnhem", name: "Arnhem", lat: 51.9851, lng: 5.8987,
+    notablePeople: ["Roy Urquhart", "John Frost"],
+    events: [
+    { title: "Battle of Arnhem", date: "Sep 17\u201325, 1944", text: "British 1st Airborne Division landed at Arnhem to capture the Rhine bridge\u2014the final objective of Operation Market Garden. Only 740 men held the north end under Colonel Frost before being overwhelmed.", wikiArticle: "Battle_of_Arnhem", casualties: "~8,000 British casualties" },
+  ]},
+  { id: "monte_cassino", name: "Monte Cassino", lat: 41.4903, lng: 13.8145,
+    notablePeople: ["W\u0142adys\u0142aw Anders", "Harold Alexander"],
+    events: [
+    { title: "Battles of Monte Cassino", date: "Jan\u2013May 1944", text: "Four massive Allied assaults on the heavily fortified Gustav Line. The ancient Benedictine monastery was controversially destroyed by bombing. Polish II Corps finally captured the summit on May 18.", wikiArticle: "Battle_of_Monte_Cassino", casualties: "~55,000 Allied, ~20,000 German" },
+  ]},
+  { id: "bastogne", name: "Bastogne", lat: 50.0, lng: 5.7167,
+    notablePeople: ["Anthony McAuliffe", "George S. Patton"],
+    events: [
+    { title: "Siege of Bastogne", date: "Dec 1944", text: "The 101st Airborne Division held Bastogne during the Battle of the Bulge. When asked to surrender, General McAuliffe famously replied 'NUTS!' Patton's Third Army broke through to relieve them.", wikiArticle: "Siege_of_Bastogne", casualties: "~3,000 US casualties" },
+  ]},
+  { id: "dresden", name: "Dresden", lat: 51.0504, lng: 13.7373,
+    notablePeople: ["Arthur 'Bomber' Harris"],
+    events: [
+    { title: "Bombing of Dresden", date: "Feb 13\u201315, 1945", text: "RAF and USAAF firebombing raids created a massive firestorm that destroyed 1,600 acres of the historic city center. The bombing remains one of the war's most controversial actions.", wikiArticle: "Bombing_of_Dresden_in_World_War_II", casualties: "~25,000 killed" },
+  ]},
+  { id: "crete", name: "Crete", lat: 35.2401, lng: 24.4709,
+    notablePeople: ["Bernard Freyberg", "Kurt Student"],
+    events: [
+    { title: "Battle of Crete", date: "May 20\u2013Jun 1, 1941", text: "Germany's airborne invasion of Crete was the first mainly airborne operation in history. Despite heavy paratrooper losses, the Germans captured the island. The casualties were so severe Hitler banned future large airborne operations.", wikiArticle: "Battle_of_Crete", casualties: "~6,500 German, ~4,000 Allied killed" },
+  ]},
+  { id: "midway_inset", name: "Midway (Pacific)", lat: 34.5, lng: -5.0, isInfoOnly: true,
+    notablePeople: ["Chester Nimitz", "C. Wade McClusky"],
+    events: [
+    { title: "Battle of Midway", date: "Jun 4\u20137, 1942", text: "US Navy dive bombers sank four Japanese aircraft carriers in five devastating minutes, turning the tide of the Pacific War. American codebreakers had broken the Japanese naval code, enabling the ambush.", wikiArticle: "Battle_of_Midway", casualties: "~3,000 Japanese, ~300 American" },
+  ]},
+];
+
+// ─── data/territories.js ────────────────────────
+const TERRITORY_PHASES = {
+  invasion_poland: {
+    axis: [
+      { id: "germany_1939", label: "Greater Germany", color: "rgba(180,40,40,0.35)", borderColor: "rgba(180,40,40,0.6)",
+        coords: [[54.8,9.5],[54.5,13.5],[53.5,14.5],[51.5,15],[51,17],[50,19],[49,22],[48.5,22.5],[47.5,21],[47,18.5],[46.5,16.5],[47,15],[47.5,13],[47.3,11],[47.5,10],[47.5,8.5],[48.5,7.5],[49.5,6.5],[50.5,6],[51.5,6],[53,7],[54,8.5]] },
+    ],
+    allied: [
+      { id: "france_1939", label: "France", color: "rgba(40,80,160,0.25)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[51,2.5],[50.5,6],[49.5,6.5],[48.5,7.5],[47.5,7],[46.5,6.5],[46,6],[44,7.5],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[46.5,-1.5],[47.5,-2.5],[48.5,-4.5],[48.8,-3],[48.5,-1.5],[49.5,0],[50.5,1.5]] },
+      { id: "uk_1939", label: "United Kingdom", color: "rgba(40,80,160,0.25)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+    ],
+    soviet: [
+      { id: "ussr_1939", label: "Soviet Union", color: "rgba(140,30,30,0.2)", borderColor: "rgba(140,30,30,0.4)",
+        coords: [[70,28],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[45,40],[46,35],[46.5,30],[48,28],[49,24],[51.5,23.5],[54,23],[56,28],[59,30],[61,30],[65,30]] },
+    ],
+  },
+  axis_expansion: {
+    axis: [
+      { id: "axis_1940", label: "Axis-Controlled Europe", color: "rgba(180,40,40,0.35)", borderColor: "rgba(180,40,40,0.6)",
+        coords: [[62,5],[62,10],[60,11],[58,12],[56,13],[54.5,13.5],[53.5,14.5],[51.5,15],[51,17],[50,19],[49,22],[48.5,22.5],[47.5,21],[47,18.5],[46.5,16.5],[45,14],[44,12.5],[43.5,10],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[46.5,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5],[51,2.5],[52,4],[53,7],[54,8.5],[55,8],[57,6],[59,5.5]] },
+    ],
+    allied: [
+      { id: "uk_1940", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+    ],
+    soviet: [
+      { id: "ussr_1940", label: "Soviet Union", color: "rgba(140,30,30,0.2)", borderColor: "rgba(140,30,30,0.4)",
+        coords: [[70,28],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[45,40],[46,35],[46.5,30],[48,28],[49,24],[51.5,23.5],[54,23],[56,28],[59,30],[61,30],[65,30]] },
+    ],
+  },
+  axis_peak: {
+    axis: [
+      { id: "axis_peak_eu", label: "Axis at Maximum Extent", color: "rgba(180,40,40,0.38)", borderColor: "rgba(180,40,40,0.65)",
+        coords: [[62,5],[62,10],[60,11],[58,12],[56,13],[54.5,13.5],[53.5,14.5],[51.5,17],[51,20],[50,24],[49,28],[48,32],[47,38],[46,42],[45,40],[44,36],[43,34],[42,30],[41,26],[39.5,22],[38,24],[37,22],[36,23],[35.5,25],[38,16],[40,15],[41,14],[43.5,10],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5],[51,2.5],[52,4],[53,7],[55,8],[57,6],[59,5.5]] },
+      { id: "north_africa_axis", label: "Axis North Africa", color: "rgba(180,40,40,0.25)", borderColor: "rgba(180,40,40,0.45)",
+        coords: [[33,10],[33.5,12],[32.5,15],[32,20],[31.5,25],[31,27],[30.5,25],[30,20],[30.5,15],[31,12],[32,10]] },
+    ],
+    allied: [
+      { id: "uk_1941", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "egypt_allied", label: "Allied Egypt", color: "rgba(40,80,160,0.2)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[31.5,25],[31,27],[30,30],[29,32.5],[27,34],[25,35],[24,33],[25,30],[27,28],[29,26],[30.5,25]] },
+    ],
+    soviet: [
+      { id: "ussr_1941", label: "Soviet Union (pushed back)", color: "rgba(140,30,30,0.25)", borderColor: "rgba(140,30,30,0.45)",
+        coords: [[70,32],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[46,42],[47,38],[48,32],[49,28],[50,24],[52,24],[55,28],[58,30],[60,32],[65,32]] },
+    ],
+  },
+  axis_peak_42: {
+    axis: [
+      { id: "axis_peak_42_eu", label: "Axis at Maximum Extent (1942)", color: "rgba(180,40,40,0.38)", borderColor: "rgba(180,40,40,0.65)",
+        coords: [[62,5],[62,10],[60,11],[58,12],[56,13],[54.5,13.5],[53.5,14.5],[51.5,17],[51,20],[50,24],[49,28],[48,32],[47,38],[46,44],[45,42],[44,36],[43,34],[42,30],[41,26],[39.5,22],[38,24],[37,22],[36,23],[35.5,25],[38,16],[40,15],[41,14],[43.5,10],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5],[51,2.5],[52,4],[53,7],[55,8],[57,6],[59,5.5]] },
+      { id: "north_africa_axis_42", label: "Axis North Africa", color: "rgba(180,40,40,0.25)", borderColor: "rgba(180,40,40,0.45)",
+        coords: [[33,10],[33.5,12],[32.5,15],[32,20],[31.5,25],[31,27],[30.5,25],[30,20],[30.5,15],[31,12],[32,10]] },
+    ],
+    allied: [
+      { id: "uk_1942", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "egypt_42", label: "Allied Egypt", color: "rgba(40,80,160,0.2)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[31.5,25],[31,27],[30,30],[29,32.5],[27,34],[25,35],[24,33],[25,30],[27,28],[29,26],[30.5,25]] },
+    ],
+    soviet: [
+      { id: "ussr_1942", label: "Soviet Union (at Stalingrad)", color: "rgba(140,30,30,0.25)", borderColor: "rgba(140,30,30,0.45)",
+        coords: [[70,32],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[46,44],[47,38],[48,32],[49,28],[50,24],[52,24],[55,28],[58,30],[60,32],[65,32]] },
+    ],
+  },
+  turning_point_42: {
+    axis: [
+      { id: "axis_tp42", label: "Axis Powers (checked)", color: "rgba(180,40,40,0.35)", borderColor: "rgba(180,40,40,0.6)",
+        coords: [[62,5],[62,10],[60,11],[58,12],[56,13],[54.5,13.5],[53.5,14.5],[51.5,17],[51,20],[50,24],[49,28],[48,32],[47,38],[46,42],[45,40],[44,36],[43,34],[42,30],[41,26],[39.5,22],[38,24],[37,22],[36,23],[35.5,25],[38,16],[40,15],[41,14],[43.5,10],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5],[51,2.5],[52,4],[53,7],[55,8],[57,6],[59,5.5]] },
+    ],
+    allied: [
+      { id: "uk_tp42", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "allied_na_tp42", label: "Allied North Africa (expanding)", color: "rgba(40,80,160,0.22)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[31.5,25],[31,27],[30,30],[29,32.5],[27,34],[25,35],[24,33],[25,30],[27,28],[29,26],[30.5,25]] },
+    ],
+    soviet: [
+      { id: "ussr_tp42", label: "Soviet Union (encircling Stalingrad)", color: "rgba(140,30,30,0.28)", borderColor: "rgba(140,30,30,0.5)",
+        coords: [[70,30],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[46,42],[47,38],[48,32],[49,28],[50,24],[52,24],[55,28],[58,30],[62,30],[65,30]] },
+    ],
+  },
+  turning_point: {
+    axis: [
+      { id: "axis_1943", label: "Axis Powers (contracting)", color: "rgba(180,40,40,0.35)", borderColor: "rgba(180,40,40,0.6)",
+        coords: [[62,5],[62,10],[60,11],[58,12],[56,13],[54.5,13.5],[53.5,14.5],[51.5,17],[51,20],[50,24],[49,28],[48,32],[47,36],[45,35],[43,30],[41,26],[39.5,22],[38,24],[37,22],[36,23],[38,16],[40,15],[41,14],[43.5,10],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5],[51,2.5],[52,4],[53,7],[55,8],[57,6],[59,5.5]] },
+    ],
+    allied: [
+      { id: "uk_1943", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "north_africa_allied", label: "Allied North Africa", color: "rgba(40,80,160,0.2)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[37,-1],[37,5],[35,8],[33.5,10],[33,12],[32.5,15],[32,20],[31.5,25],[30,30],[29,32.5],[27,34],[25,33],[25,25],[27,15],[30,5],[33,0],[35.5,-1]] },
+    ],
+    soviet: [
+      { id: "ussr_1943", label: "Soviet Union (advancing)", color: "rgba(140,30,30,0.28)", borderColor: "rgba(140,30,30,0.5)",
+        coords: [[70,30],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[46,40],[47,36],[48,32],[49,28],[50,24],[52,24],[55,28],[58,30],[62,30],[65,30]] },
+    ],
+  },
+  allied_advance_43: {
+    axis: [
+      { id: "axis_43_late", label: "Axis (losing ground)", color: "rgba(180,40,40,0.35)", borderColor: "rgba(180,40,40,0.6)",
+        coords: [[62,5],[62,10],[60,11],[58,12],[56,13],[54.5,13.5],[53.5,14.5],[51.5,17],[51,20],[50,24],[49,28],[48,32],[47,36],[45,35],[43,30],[41,26],[39.5,22],[38,24],[37,22],[36,23],[38,16],[40,15],[41,14],[43.5,10],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5],[51,2.5],[52,4],[53,7],[55,8],[57,6],[59,5.5]] },
+    ],
+    allied: [
+      { id: "uk_43l", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "na_allied_43l", label: "Allied North Africa", color: "rgba(40,80,160,0.2)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[37,-1],[37,5],[35,8],[33.5,10],[33,12],[32.5,15],[32,20],[31.5,25],[30,30],[29,32.5],[27,34],[25,33],[25,25],[27,15],[30,5],[33,0],[35.5,-1]] },
+      { id: "sicily_allied", label: "Allied Sicily", color: "rgba(40,80,160,0.22)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[38.5,12.5],[38,13.5],[37.5,13],[37,14.5],[37.5,15.5],[38.5,15.5],[39,14.5],[38.5,13]] },
+    ],
+    soviet: [
+      { id: "ussr_43l", label: "Soviet Union (advancing)", color: "rgba(140,30,30,0.28)", borderColor: "rgba(140,30,30,0.5)",
+        coords: [[70,28],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[46,40],[47,36],[48,32],[49,28],[50,24],[52,24],[55,28],[58,28],[62,28],[65,28]] },
+    ],
+  },
+  allied_advance: {
+    axis: [
+      { id: "axis_1944", label: "Shrinking Reich", color: "rgba(180,40,40,0.35)", borderColor: "rgba(180,40,40,0.6)",
+        coords: [[55,8],[56,13],[54.5,14],[53.5,15],[52,17],[51,19],[50,20],[49.5,18],[48.5,16],[47.5,15],[47,13],[47.5,11],[48,9],[49,8],[50.5,7],[52,7.5],[53.5,8]] },
+    ],
+    allied: [
+      { id: "uk_1944", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "france_liberated", label: "Liberated France", color: "rgba(40,80,160,0.28)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[51,2.5],[50.5,6],[49.5,6.5],[48.5,7.5],[47.5,7],[46.5,6.5],[46,6],[44,7.5],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5]] },
+      { id: "italy_allied", label: "Allied Italy", color: "rgba(40,80,160,0.22)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[44.5,7.5],[45.5,10],[45,12.5],[44,12.5],[43.5,13.5],[42.5,14],[41.5,15.5],[40.5,16],[39.5,16.5],[38.5,16],[38,15.5],[37.5,13],[38.5,12.5],[40,15],[41,14],[42.5,12],[43.5,10],[43.5,7.5]] },
+      { id: "north_africa_1944", label: "Allied North Africa", color: "rgba(40,80,160,0.15)", borderColor: "rgba(40,80,160,0.3)",
+        coords: [[37,-1],[37,5],[35,8],[33.5,10],[32.5,15],[32,20],[31.5,25],[30,30],[27,34],[25,33],[25,25],[27,15],[30,5],[33,0],[35.5,-1]] },
+    ],
+    soviet: [
+      { id: "ussr_1944", label: "Soviet Union (liberating East)", color: "rgba(140,30,30,0.3)", borderColor: "rgba(140,30,30,0.5)",
+        coords: [[70,20],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[45,40],[45,35],[46,28],[47,22],[49.5,18],[51,19],[52,17],[54.5,14],[56,15],[58,18],[60,20],[65,20]] },
+    ],
+  },
+  allied_advance_late: {
+    axis: [
+      { id: "axis_late44", label: "Shrinking Reich (Dec 1944)", color: "rgba(180,40,40,0.32)", borderColor: "rgba(180,40,40,0.55)",
+        coords: [[55,8],[56,13],[54.5,14],[53.5,15],[52,16],[51,18],[50,18],[49.5,16],[48.5,15],[47.5,14],[47,13],[47.5,11],[48,9],[49,8],[50.5,7],[52,7.5],[53.5,8]] },
+    ],
+    allied: [
+      { id: "uk_late44", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "france_lib_late", label: "Liberated France & BeNeLux", color: "rgba(40,80,160,0.28)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[51,2.5],[50.5,6],[49.5,6.5],[48.5,7.5],[47.5,7],[46.5,6.5],[46,6],[44,7.5],[43.5,7],[43,5],[42.5,3],[42.8,0.5],[43.5,-1.5],[45,-1.5],[47.5,-2.5],[48.5,-4.5],[49.5,-1],[50.5,1.5]] },
+      { id: "italy_late44", label: "Allied Italy", color: "rgba(40,80,160,0.22)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[44.5,7.5],[45.5,10],[45,12.5],[44,12.5],[43.5,13.5],[42.5,14],[41.5,15.5],[40.5,16],[39.5,16.5],[38.5,16],[38,15.5],[37.5,13],[38.5,12.5],[40,15],[41,14],[42.5,12],[43.5,10],[43.5,7.5]] },
+    ],
+    soviet: [
+      { id: "ussr_late44", label: "Soviet Union (at the Vistula)", color: "rgba(140,30,30,0.32)", borderColor: "rgba(140,30,30,0.55)",
+        coords: [[70,18],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[45,40],[45,35],[46,28],[47,22],[49,19],[50,18],[51,18],[52,16],[54.5,14],[56,15],[58,18],[60,18],[65,18]] },
+    ],
+  },
+  victory_approach: {
+    axis: [
+      { id: "axis_1945_shrink", label: "Collapsing Reich", color: "rgba(180,40,40,0.3)", borderColor: "rgba(180,40,40,0.5)",
+        coords: [[54.5,11],[55,13],[54,14],[53,14.5],[52,14],[51.5,13.5],[51,13],[50.5,12],[50.5,11],[51,10.5],[52,10.5],[53,10.5],[54,10.5]] },
+    ],
+    allied: [
+      { id: "uk_1945a", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "western_allied_45a", label: "Western Allied Zone", color: "rgba(40,80,160,0.28)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[55,8],[53,7],[52,4],[51,2.5],[50.5,1.5],[49.5,-1],[48.5,-4.5],[47.5,-2.5],[45,-1.5],[42.8,0.5],[42.5,3],[43,5],[43.5,7],[44,7.5],[46,6],[47.5,7],[48.5,7.5],[49.5,6.5],[50.5,6],[51,7],[52,8],[53,9],[54,9.5],[54.5,10]] },
+      { id: "italy_45a", label: "Italy", color: "rgba(40,80,160,0.22)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[46.5,7],[47,10],[46.5,13.5],[45.5,14],[44,12.5],[43.5,13.5],[42.5,14],[41,16],[39.5,16.5],[38,16],[37.5,13],[38.5,12.5],[40,15],[41,14],[42.5,12],[43.5,10],[44,7.5]] },
+    ],
+    soviet: [
+      { id: "soviet_45a", label: "Soviet Zone (at the Oder)", color: "rgba(140,30,30,0.35)", borderColor: "rgba(140,30,30,0.55)",
+        coords: [[70,14],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[45,35],[44,28],[43,22],[42,18],[44,15],[46.5,14],[48,14],[49,14],[50,14],[51,14],[52,14],[53,14.5],[54,14],[56,14],[58,14],[60,14],[62,14],[65,14]] },
+    ],
+  },
+  victory: {
+    axis: [],
+    allied: [
+      { id: "uk_1945", label: "United Kingdom", color: "rgba(40,80,160,0.3)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[50,-5.5],[50.5,-3.5],[51,-1],[51.5,1.5],[53,0.5],[53.5,-1],[54.5,-3],[55.5,-2],[56.5,-3.5],[57.5,-5],[58.5,-3.5],[57.5,-2],[56,-2.5],[55,-4],[54,-5.5],[53,-4.5],[52,-5],[51,-5.5]] },
+      { id: "western_allied_zone", label: "Western Allied Zone", color: "rgba(40,80,160,0.28)", borderColor: "rgba(40,80,160,0.5)",
+        coords: [[55,8],[53,7],[52,4],[51,2.5],[50.5,1.5],[49.5,-1],[48.5,-4.5],[47.5,-2.5],[45,-1.5],[42.8,0.5],[42.5,3],[43,5],[43.5,7],[44,7.5],[46,6],[47.5,7],[48.5,7.5],[49.5,6.5],[50.5,6],[51.5,6],[53,7],[54,8.5],[54.5,9.5],[54.5,11],[53.5,11.5],[52.5,11],[52,10.5]] },
+      { id: "italy_1945", label: "Italy", color: "rgba(40,80,160,0.22)", borderColor: "rgba(40,80,160,0.4)",
+        coords: [[46.5,7],[47,10],[46.5,13.5],[45.5,14],[44,12.5],[43.5,13.5],[42.5,14],[41,16],[39.5,16.5],[38,16],[37.5,13],[38.5,12.5],[40,15],[41,14],[42.5,12],[43.5,10],[44,7.5]] },
+    ],
+    soviet: [
+      { id: "soviet_zone_1945", label: "Soviet Zone", color: "rgba(140,30,30,0.35)", borderColor: "rgba(140,30,30,0.55)",
+        coords: [[70,12],[70,40],[68,50],[65,55],[60,55],[55,52],[50,50],[47,45],[45,35],[44,28],[43,22],[41,20],[42,18],[44,15],[46.5,14],[47.5,13.5],[48,12],[49,11.5],[50,12],[51,12],[52.5,11],[53.5,11.5],[54.5,11],[55,12],[56,13],[58,14],[60,14],[62,12],[65,12]] },
+    ],
+  },
+};
+</script>
+
+<!-- ═══════════════════════════════════════
+     App Logic (components/App.js equivalent)
+     ═══════════════════════════════════════ -->
+<script>
+(function() {
+  'use strict';
+
+  // ─── State ─────────────────────────
+  let selectedEventIndex = 0;
+  let selectedCity = null;
+  let selectedCityEventIdx = 0;
+  let isPlaying = false;
+  let playInterval = null;
+  let activeYearFilter = 'all';
+  let filteredEvents = [...WW2_EVENTS];
+  const imageCache = {};
+
+  // ─── Leaflet Map Setup ─────────────
+  const map = L.map('map', {
+    center: [48.5, 18],
+    zoom: 4,
+    minZoom: 3,
+    maxZoom: 10,
+    zoomControl: true,
+    attributionControl: true,
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(map);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 19,
+    pane: 'shadowPane',
+    opacity: 0.35,
+  }).addTo(map);
+
+  // ─── Territory Layer Group ─────────
+  let territoryLayers = L.layerGroup().addTo(map);
+
+  function renderTerritories(phase) {
+    territoryLayers.clearLayers();
+    const data = TERRITORY_PHASES[phase];
+    if (!data) return;
+
+    ['soviet', 'allied', 'axis'].forEach(faction => {
+      (data[faction] || []).forEach(territory => {
+        const polygon = L.polygon(territory.coords, {
+          color: territory.borderColor,
+          weight: 1.5,
+          fillColor: territory.color,
+          fillOpacity: 1,
+          opacity: 0.8,
+          smoothFactor: 1.5,
+        });
+
+        polygon.bindTooltip(territory.label, {
+          permanent: false,
+          direction: 'center',
+          className: 'city-label',
+        });
+
+        territoryLayers.addLayer(polygon);
+      });
+    });
+  }
+
+  // ─── City Markers ──────────────────
+  let cityMarkerLayers = L.layerGroup().addTo(map);
+  let cityMarkerRefs = {};
+
+  function createCityMarkers() {
+    CITY_MARKERS.forEach(city => {
+      const icon = L.divIcon({
+        className: 'city-marker-icon',
+        html: '<div class="city-marker-dot" id="dot-' + city.id + '"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      });
+
+      const marker = L.marker([city.lat, city.lng], { icon })
+        .on('click', () => openCityPanel(city));
+
+      marker.bindTooltip(city.name, {
+        permanent: true,
+        direction: 'right',
+        offset: [10, 0],
+        className: 'city-label',
+      });
+
+      cityMarkerRefs[city.id] = marker;
+      cityMarkerLayers.addLayer(marker);
+    });
+  }
+
+  // ─── Wikipedia Image Fetching ──────
+  async function fetchWikiImage(articleTitle) {
+    if (!articleTitle) return null;
+    if (imageCache[articleTitle] !== undefined) return imageCache[articleTitle];
+
+    try {
+      const resp = await fetch(
+        'https://en.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(articleTitle)
+      );
+      if (!resp.ok) { imageCache[articleTitle] = null; return null; }
+      const data = await resp.json();
+      const url = data.thumbnail?.source || null;
+      imageCache[articleTitle] = url;
+      return url;
+    } catch {
+      imageCache[articleTitle] = null;
+      return null;
+    }
+  }
+
+  function loadImageIntoContainer(articleTitle) {
+    const img = document.getElementById('city-event-img');
+    const placeholder = document.getElementById('city-img-placeholder');
+    const spinner = document.getElementById('city-img-spinner');
+    const icon = document.getElementById('city-img-icon');
+
+    // Reset
+    img.classList.remove('loaded');
+    img.src = '';
+    placeholder.classList.remove('hidden');
+    spinner.style.display = 'block';
+    icon.style.display = 'none';
+
+    fetchWikiImage(articleTitle).then(url => {
+      if (url) {
+        img.onload = () => {
+          img.classList.add('loaded');
+          placeholder.classList.add('hidden');
+        };
+        img.onerror = () => {
+          spinner.style.display = 'none';
+          icon.style.display = 'block';
+        };
+        img.src = url;
+        img.alt = articleTitle ? articleTitle.replace(/_/g, ' ') : '';
+      } else {
+        spinner.style.display = 'none';
+        icon.style.display = 'block';
+      }
+    });
+  }
+
+  // ─── City Info Panel Logic ─────────
+  const cityPanel = document.getElementById('city-panel');
+  const cityPanelName = document.getElementById('city-panel-name');
+  const cityEventTabs = document.getElementById('city-event-tabs');
+  const cityEventTitle = document.getElementById('city-event-title');
+  const cityEventDate = document.getElementById('city-event-date');
+  const cityEventText = document.getElementById('city-event-text');
+  const cityEventSource = document.getElementById('city-event-source');
+  const cityEventStats = document.getElementById('city-event-stats');
+  const notablePeopleSection = document.getElementById('city-notable-people');
+  const notablePeopleList = document.getElementById('notable-people-list');
+
+  function openCityPanel(city) {
+    if (selectedCity) {
+      const prevDot = document.getElementById('dot-' + selectedCity.id);
+      if (prevDot) prevDot.classList.remove('active');
+    }
+
+    if (selectedCity && selectedCity.id === city.id) {
+      closeCityPanel();
+      return;
+    }
+
+    selectedCity = city;
+    selectedCityEventIdx = 0;
+
+    const dot = document.getElementById('dot-' + city.id);
+    if (dot) dot.classList.add('active');
+
+    cityPanelName.textContent = city.name;
+
+    // Notable people
+    if (city.notablePeople && city.notablePeople.length > 0) {
+      notablePeopleSection.style.display = 'block';
+      notablePeopleList.innerHTML = city.notablePeople
+        .map(p => '<span class="person-tag">' + p + '</span>')
+        .join('');
+    } else {
+      notablePeopleSection.style.display = 'none';
+    }
+
+    // Tabs
+    cityEventTabs.innerHTML = '';
+    if (city.events.length > 1) {
+      cityEventTabs.classList.add('visible');
+      city.events.forEach((evt, idx) => {
+        const tab = document.createElement('button');
+        tab.className = 'city-tab' + (idx === 0 ? ' active' : '');
+        tab.textContent = evt.date;
+        tab.addEventListener('click', () => {
+          selectedCityEventIdx = idx;
+          document.querySelectorAll('.city-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          renderCityEvent();
+        });
+        cityEventTabs.appendChild(tab);
+      });
+    } else {
+      cityEventTabs.classList.remove('visible');
+    }
+
+    renderCityEvent();
+    cityPanel.classList.add('open');
+  }
+
+  function renderCityEvent() {
+    if (!selectedCity) return;
+    const evt = selectedCity.events[selectedCityEventIdx];
+    cityEventTitle.textContent = evt.title;
+    cityEventDate.textContent = evt.date;
+    cityEventText.textContent = evt.text;
+
+    // Load image from Wikipedia
+    loadImageIntoContainer(evt.wikiArticle);
+
+    // Casualties / stats
+    if (evt.casualties) {
+      cityEventStats.innerHTML = '<div class="stat-item"><span class="stat-value">' + evt.casualties + '</span>Casualties</div>';
+      cityEventStats.style.display = 'flex';
+    } else {
+      cityEventStats.style.display = 'none';
+    }
+
+    cityEventSource.textContent = evt.wikiArticle
+      ? '\uD83D\uDCDA Source: Wikipedia \u2013 ' + evt.wikiArticle.replace(/_/g, ' ')
+      : '';
+  }
+
+  function closeCityPanel() {
+    if (selectedCity) {
+      const dot = document.getElementById('dot-' + selectedCity.id);
+      if (dot) dot.classList.remove('active');
+    }
+    selectedCity = null;
+    cityPanel.classList.remove('open');
+  }
+
+  document.getElementById('close-city-btn').addEventListener('click', closeCityPanel);
+
+  // ─── Year Filter ───────────────────
+  function setYearFilter(year) {
+    activeYearFilter = year;
+
+    // Update button states
+    document.querySelectorAll('.year-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.year === String(year));
+    });
+
+    // Filter events
+    if (year === 'all') {
+      filteredEvents = [...WW2_EVENTS];
+    } else {
+      filteredEvents = WW2_EVENTS.filter(e => e.year === parseInt(year));
+    }
+
+    // Reset selection to first filtered event
+    selectedEventIndex = 0;
+    if (filteredEvents.length > 0) {
+      selectEvent(0);
+    }
+  }
+
+  // Wire up year selector buttons
+  document.querySelectorAll('.year-btn').forEach(btn => {
+    btn.addEventListener('click', () => setYearFilter(btn.dataset.year));
+  });
+
+  // ─── Timeline Rendering ────────────
+  const timelineList = document.getElementById('timeline-list');
+
+  function renderTimeline() {
+    timelineList.innerHTML = '';
+
+    // Add year header if filtering by year
+    if (activeYearFilter !== 'all') {
+      const header = document.createElement('div');
+      header.style.cssText = 'padding: 8px 24px; font-size: 12px; color: var(--gold-dim); letter-spacing: 2px; text-transform: uppercase; font-family: var(--font-mono);';
+      header.textContent = activeYearFilter + ' \u2022 ' + filteredEvents.length + ' events';
+      timelineList.appendChild(header);
+    }
+
+    filteredEvents.forEach((event, index) => {
+      const btn = document.createElement('button');
+      const phaseColor = PHASE_LABELS[event.phase]?.color || '#888';
+
+      let classes = 'timeline-event';
+      if (index === selectedEventIndex) classes += ' active';
+      if (index < selectedEventIndex) classes += ' past';
+      btn.className = classes;
+
+      if (index === selectedEventIndex) {
+        btn.style.borderLeftColor = phaseColor;
+      }
+
+      btn.innerHTML =
+        '<div class="event-dot-col">' +
+          '<div class="event-dot" style="background: ' + (index === selectedEventIndex ? phaseColor : '') + '; ' + (index === selectedEventIndex ? 'box-shadow: 0 0 12px ' + phaseColor + '60;' : '') + '"></div>' +
+          (index < filteredEvents.length - 1 ? '<div class="event-line"></div>' : '') +
+        '</div>' +
+        '<div class="event-content">' +
+          '<div class="event-date" style="color: ' + (index === selectedEventIndex ? phaseColor : '') + '">' + event.date + '</div>' +
+          '<div class="event-title">' + event.title + '</div>' +
+          '<div class="event-description">' + event.description + '</div>' +
+        '</div>';
+
+      btn.addEventListener('click', () => selectEvent(index));
+      timelineList.appendChild(btn);
+    });
+  }
+
+  // ─── Core State Transitions ────────
+  function selectEvent(index) {
+    selectedEventIndex = index;
+    closeCityPanel();
+
+    const event = filteredEvents[index];
+    if (!event) return;
+    const phase = PHASE_LABELS[event.phase] || PHASE_LABELS.invasion_poland;
+
+    // Update phase indicator
+    document.getElementById('phase-dot').style.background = phase.color;
+    document.getElementById('phase-dot').style.boxShadow = '0 0 10px ' + phase.color + '80';
+    document.getElementById('phase-label').textContent = phase.label;
+    document.getElementById('phase-label').style.color = phase.color;
+    document.getElementById('phase-date').textContent = event.date;
+
+    // Update progress bar
+    const pct = ((index + 1) / filteredEvents.length) * 100;
+    const fill = document.getElementById('progress-bar-fill');
+    fill.style.width = pct + '%';
+    fill.style.background = 'linear-gradient(90deg, ' + phase.color + ', ' + phase.color + '80)';
+
+    document.getElementById('phase-indicator').style.borderColor = phase.color + '40';
+
+    // Render territories
+    renderTerritories(event.phase);
+
+    // Re-render timeline
+    renderTimeline();
+
+    // Scroll active event into view
+    const activeBtn = timelineList.querySelector('.timeline-event.active');
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  // ─── Play/Pause ────────────────────
+  const playBtn = document.getElementById('play-btn');
+
+  function togglePlay() {
+    if (isPlaying) {
+      clearInterval(playInterval);
+      isPlaying = false;
+      playBtn.textContent = '\u25B6 Play Through War';
+      playBtn.classList.remove('playing');
+      return;
+    }
+
+    isPlaying = true;
+    playBtn.textContent = '\u23F8 Pause Timeline';
+    playBtn.classList.add('playing');
+
+    let idx = selectedEventIndex;
+    playInterval = setInterval(() => {
+      idx++;
+      if (idx >= filteredEvents.length) {
+        clearInterval(playInterval);
+        isPlaying = false;
+        playBtn.textContent = '\u25B6 Play Through War';
+        playBtn.classList.remove('playing');
+        return;
+      }
+      selectEvent(idx);
+    }, 2500);
+  }
+
+  playBtn.addEventListener('click', togglePlay);
+
+  // ─── Keyboard Navigation ───────────
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (selectedEventIndex < filteredEvents.length - 1) selectEvent(selectedEventIndex + 1);
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (selectedEventIndex > 0) selectEvent(selectedEventIndex - 1);
+    } else if (e.key === ' ') {
+      e.preventDefault();
+      togglePlay();
+    } else if (e.key === 'Escape') {
+      closeCityPanel();
+    }
+  });
+
+  // ─── Initialize ────────────────────
+  createCityMarkers();
+  selectEvent(0);
+
+})();
+</script>
+</body>
+</html>
