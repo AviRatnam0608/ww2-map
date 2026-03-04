@@ -1,0 +1,33 @@
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg-primary: #0a0c10;
+  --bg-panel: #0d0f14;
+  --bg-panel-end: #111520;
+  --gold: #c0a030;
+  --gold-bright: #e0c060;
+  --gold-dim: rgba(180, 160, 120, 0.5);
+  --gold-faint: rgba(180, 160, 120, 0.15);
+  --gold-ghost: rgba(180, 160, 120, 0.08);
+  --text-primary: #e8e0d0;
+  --text-secondary: rgba(200, 190, 170, 0.7);
+  --text-dim: rgba(180, 170, 150, 0.6);
+  --text-ghost: rgba(180, 160, 120, 0.4);
+  --axis-color: #b42828;
+  --axis-peak: #d43030;
+  --turning-color: #c4a020;
+  --allied-color: #2860a0;
+  --victory-color: #2a7030;
+  --soviet-color: rgba(140, 30, 30, 0.8);
+  --font-serif: 'EB Garamond', 'Garamond', 'Georgia', serif;
+  --font-mono: 'Courier New', monospace;
+  --panel-width: 320px;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg-primary); }
+
+body {
+  font-family: var(--font-serif);
+  color: var(--text-primary);
+  display: flex;
+}

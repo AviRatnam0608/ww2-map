@@ -1,0 +1,63 @@
+/* ═══════════════════════════════════════
+   styles/animations.css
+   ═══════════════════════════════════════ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.4; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(180, 160, 120, 0.15); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(180, 160, 120, 0.25); }
+
+/* Custom Leaflet marker */
+.city-marker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.city-marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(192, 160, 48, 0.7);
+  border: 2px solid rgba(192, 160, 48, 0.4);
+  box-shadow: 0 0 8px rgba(192, 160, 48, 0.3);
+  transition: all 0.3s ease;
+}
+
+.city-marker-dot.active {
+  width: 14px;
+  height: 14px;
+  background: #c0a030;
+  border-color: #e0c060;
+  box-shadow: 0 0 16px rgba(192, 160, 48, 0.5);
+}
+
+/* City label tooltip */
+.city-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: rgba(200, 190, 170, 0.6) !important;
+  font-family: 'EB Garamond', Georgia, serif !important;
+  font-size: 11px !important;
+  font-style: italic;
+  white-space: nowrap;
+  padding: 0 !important;
+}
+
+.city-label::before { display: none !important; }
